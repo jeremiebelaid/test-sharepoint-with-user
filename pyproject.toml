@@ -1,0 +1,21 @@
+[project]
+name = "test-sharepoint-with-user"
+version = "0.1.0"
+description = "Project to test SharePoint with a user"
+requires-python = ">=3.13"
+dependencies = [
+    "azure-identity>=1.15.0",
+    "requests>=2.31.0",
+    "urllib3>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "pylint>=3.0.0",
+    "black>=23.0.0",
+    "ruff>=0.12.4",
+]
+
+[tool.black]
+line-length = 88
+
+[tool.pylint]
+max-line-length = 88
+disable = "C0114,C0115,C0116" 

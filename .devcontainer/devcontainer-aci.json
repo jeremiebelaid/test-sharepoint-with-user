@@ -12,7 +12,6 @@
         "ms-vscode-remote.remote-ssh",
         "ms-python.black-formatter",
         "ms-python.flake8",
-        "github.copilot",
         "ms-vscode.azure-account"
       ],
       "settings": {

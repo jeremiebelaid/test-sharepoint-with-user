@@ -9,7 +9,7 @@ echo "=========================================="
 echo "🚀 Container Ubuntu avec SSH démarré"
 echo "=========================================="
 echo "Utilisateur: developer"
-echo "Mot de passe: AzureDev2024!"
+echo "Mot de passe: $(cat /run/secrets/dev_password)"
 echo "Port SSH: 22"
 echo "=========================================="
 
