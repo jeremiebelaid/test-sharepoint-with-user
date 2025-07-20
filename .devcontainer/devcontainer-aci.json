@@ -1,0 +1,52 @@
+{
+  "name": "Python SharePoint Auth - ACI Remote",
+  "remoteUser": "vscode",
+  "workspaceFolder": "/workspace",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-azuretools.vscode-azurecli",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode-remote.remote-ssh",
+        "ms-python.black-formatter",
+        "ms-python.flake8",
+        "github.copilot",
+        "ms-vscode.azure-account"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/bin/python3",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "python.formatting.provider": "black",
+        "python.linting.flake8Enabled": true,
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "terminal.integrated.shell.linux": "/bin/bash",
+        "files.autoSave": "afterDelay",
+        "files.autoSaveDelay": 1000,
+        "azure.resourceFilter": [
+          "rg-sharepoint-test"
+        ]
+      }
+    }
+  },
+  "forwardPorts": [22],
+  "portsAttributes": {
+    "22": {
+      "label": "SSH",
+      "onAutoForward": "silent"
+    }
+  },
+  "postCreateCommand": [
+    "bash",
+    "-c",
+    "echo '🚀 ACI Development Environment Ready!' && echo '🔑 Azure Client ID: ${AZURE_CLIENT_ID}' && echo '📁 Workspace: /workspace' && python3 --version"
+  ],
+  "remoteEnv": {
+    "AZURE_CLIENT_ID": "${localEnv:AZURE_CLIENT_ID}",
+    "SHAREPOINT_SITE_ID": "${localEnv:SHAREPOINT_SITE_ID}",
+    "SHAREPOINT_DRIVE_ID": "${localEnv:SHAREPOINT_DRIVE_ID}",
+    "SHAREPOINT_FOLDER_PATH": "${localEnv:SHAREPOINT_FOLDER_PATH}"
+  }
+} 

@@ -1,0 +1,25 @@
+apiVersion: 2022-03-01
+location: westeurope
+name: sharepoint-auth-test
+properties:
+  managedEnvironmentId: /subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.App/managedEnvironments/{environment-name}
+  template:
+    containers:
+    - name: python-sharepoint-app
+      image: {your-registry}.azurecr.io/python-sharepoint:latest
+      resources:
+        cpu: 0.5
+        memory: 1Gi
+      env:
+      - name: SHAREPOINT_SITE_URL
+        value: "https://ddasys.sharepoint.com/sites/DDASYS"
+      - name: USE_MANAGED_IDENTITY
+        value: "true"
+      - name: PYTHONUNBUFFERED
+        value: "1"
+      - name: SHAREPOINT_FOLDER_PATH
+        value: "Documents partages/General/Test-user-assigned-identity"
+  identity:
+    type: UserAssigned
+    userAssignedIdentities:
+      /subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/sharepoint-auth-identity: {} 
