@@ -11,7 +11,7 @@ from azure.identity import AzureCliCredential
 from dotenv import load_dotenv
 
 # Chargement de la configuration
-load_dotenv('config.env')
+load_dotenv('.env')
 
 
 def test_simple_write():

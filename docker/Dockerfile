@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y nala && nala install -y \
     vim \
     nano \
     unzip \
+    gosu \
     python3 \
     python3-pip \
     python3-venv \
@@ -23,6 +24,10 @@ RUN apt-get update && apt-get install -y nala && nala install -y \
     libreadline-dev libsqlite3-dev wget curl llvm \
     libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Installation de l'Azure CLI
+RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash && \
+    az upgrade
 
 # Configuration SSH
 RUN --mount=type=secret,id=dev_password \
@@ -43,43 +48,46 @@ RUN --mount=type=secret,id=dev_password \
     && chmod 600 /home/developer/.ssh/authorized_keys \
     && chown -R developer:developer /home/developer/.ssh
 
-# Installation de Homebrew et asdf
+# Passer à l'utilisateur developer pour les installations spécifiques
 USER developer
 WORKDIR /home/developer
 
-# Installer Homebrew. Le script ajoute la configuration au fichier .profile de l'utilisateur.
-RUN /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+ENV PATH="/home/developer/.asdf/bin:/home/developer/.asdf/shims:/home/linuxbrew/.linuxbrew/bin:/home/developer/.local/bin:${PATH}"
 
-# Configurer l'environnement, installer asdf, Python, et Terraform
-RUN export PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH" && \
-    brew install asdf && \
-    export ASDF_DIR="$(brew --prefix asdf)" && \
-    echo -e "\n. ${ASDF_DIR}/libexec/asdf.sh" >> /home/developer/.bashrc && \
-    . "${ASDF_DIR}/libexec/asdf.sh" && \
+# Installation de Homebrew et des outils
+RUN /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && \
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && \
+    brew install asdf uv && \
     asdf plugin add python && \
-    asdf install python 3.13.5 && \
-    asdf set global python 3.13.5 && \
     asdf plugin add terraform && \
-    asdf install terraform latest && \
-    asdf set global terraform $(asdf latest terraform) && \
     asdf plugin add direnv && \
+    asdf install python 3.13.5 && \
+    asdf install terraform latest && \
     asdf install direnv latest && \
-    asdf set global direnv $(asdf latest direnv) && \
-    echo 'eval "$(asdf exec direnv hook bash)"' >> /home/developer/.bashrc
+    asdf set global python 3.13.5 && \
+    asdf set global terraform $(asdf latest terraform) && \
+    asdf set global direnv $(asdf latest direnv)
 
-# Copier le fichier de projet avant d'installer les dépendances
-COPY --chown=developer:developer pyproject.toml /home/developer/pyproject.toml
+# Configuration du shell
+RUN echo '' >> ~/.bashrc && \
+    echo '# Homebrew & asdf setup' >> ~/.bashrc && \
+    echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc && \
+    echo 'export ASDF_DIR="$(brew --prefix asdf)"' >> ~/.bashrc && \
+    echo '. "$ASDF_DIR/libexec/asdf.sh"' >> ~/.bashrc && \
+    echo 'eval "$(asdf exec direnv hook bash)"' >> ~/.bashrc && \
+    echo '[[ -f ~/.bashrc ]] && . ~/.bashrc' > ~/.bash_profile
 
-# Installer uv, créer un venv et installer les dépendances du projet
+# Installation de uv et des dépendances du projet
+COPY --chown=developer:developer pyproject.toml .
 RUN eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && \
-    export PATH="/home/developer/.local/bin:$PATH" && \
-    curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    uv venv /home/developer/venv && \
-    . /home/developer/venv/bin/activate && \
+    export ASDF_DIR="$(brew --prefix asdf)" && \
+    . "$ASDF_DIR/libexec/asdf.sh" && \
+    uv venv && \
     uv pip install .
 
-# Revenir à l'utilisateur root pour les commandes suivantes
+# Configuration globale du PATH
 USER root
+ENV PATH="/home/developer/.asdf/bin:/home/developer/.asdf/shims:/home/linuxbrew/.linuxbrew/bin:/home/developer/.local/bin:${PATH}"
 
 # Création du répertoire de travail
 RUN mkdir -p /workspace && chown developer:developer /workspace
@@ -88,8 +96,7 @@ RUN mkdir -p /workspace && chown developer:developer /workspace
 EXPOSE 22
 
 # Script de démarrage
-COPY docker/start.sh /start.sh
-RUN chmod +x /start.sh
+COPY --chown=developer:developer --chmod=755 docker/start.sh /start.sh
 
 # Commande par défaut
 ENTRYPOINT ["/start.sh"]

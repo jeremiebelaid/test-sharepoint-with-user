@@ -177,4 +177,4 @@ if __name__ == "__main__":
         print("Vous pouvez maintenant vérifier le fichier dans SharePoint.")
     else:
         print("\n❌ Test d'écriture échoué.")
-    sys.exit(0 if success else 1) 
+    sys.exit(0 if success else 1)

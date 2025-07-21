@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Script d'aide pour configurer les permissions Microsoft Graph
+# Script d'aide pour configurer les permissions Microsoft Graph et SharePoint
 # ⚠️  À EXÉCUTER AVEC DES DROITS D'ADMINISTRATEUR AZURE AD
 #
 
@@ -13,8 +13,8 @@ USER_IDENTITY_NAME="id-sharepoint-test"
 SHAREPOINT_SITE_URL="https://ddasys.sharepoint.com/sites/DDASYS"
 
 
-echo "🔑 Configuration des permissions Microsoft Graph RESTREINTES pour User Assigned Identity"
-echo "========================================================================================"
+echo "🔑 Configuration des permissions Microsoft Graph et SharePoint RESTREINTES pour User Assigned Identity"
+echo "====================================================================================================="
 
 # Récupération de l'identité
 if ! az identity show --resource-group "$RESOURCE_GROUP" --name "$USER_IDENTITY_NAME" >/dev/null 2>&1; then
@@ -30,27 +30,50 @@ echo "🆔 Identity trouvée:"
 echo "   Client ID: $IDENTITY_CLIENT_ID"
 echo "   Principal ID: $IDENTITY_PRINCIPAL_ID"
 
-# ID de l'application Microsoft Graph
+echo -e "\n🔧 Configuration des permissions API (restreintes)..."
+
+# --- Microsoft Graph Permissions ---
+echo -e "\n1. Attribution des permissions pour Microsoft Graph..."
 GRAPH_APP_ID="00000003-0000-0000-c000-000000000000"
 GRAPH_RESOURCE_ID=$(az ad sp show --id "$GRAPH_APP_ID" --query id -o tsv)
 
-echo -e "\n🔧 Configuration des permissions Microsoft Graph (restreintes)..."
-
-# 1. Obtenir l'ID de la permission Sites.Selected
-echo "1. Récupération de l'ID de la permission 'Sites.Selected'..."
+# 1a. Obtenir et attribuer l'ID de la permission Sites.Selected
+echo "   - Récupération et attribution de 'Sites.Selected' (Graph)..."
 SITES_SELECTED_ID=$(az ad sp show --id "$GRAPH_APP_ID" --query "appRoles[?value=='Sites.Selected'].id" -o tsv)
 if [ -z "$SITES_SELECTED_ID" ]; then
-    echo "❌ Permission 'Sites.Selected' non trouvée pour Microsoft Graph."
-    exit 1
+    echo "   ❌ Permission 'Sites.Selected' non trouvée pour Microsoft Graph."
+else
+    az rest --method POST \
+        --uri "https://graph.microsoft.com/v1.0/servicePrincipals/$IDENTITY_PRINCIPAL_ID/appRoleAssignments" \
+        --body "{'principalId':'$IDENTITY_PRINCIPAL_ID','resourceId':'$GRAPH_RESOURCE_ID','appRoleId':'$SITES_SELECTED_ID'}" \
+        --headers "Content-Type=application/json" >/dev/null || echo "     ⚠️  Permission API 'Sites.Selected' (Graph) peut-être déjà attribuée."
+    echo "     ✅ Permission 'Sites.Selected' (Graph) traitée."
 fi
-echo "   ✅ Sites.Selected: $SITES_SELECTED_ID"
 
-# 2. Attribution de Sites.Selected à l'identité managée
-echo -e "\n2. Attribution de la permission 'Sites.Selected' à l'identité..."
-az rest --method POST \
-    --uri "https://graph.microsoft.com/v1.0/servicePrincipals/$IDENTITY_PRINCIPAL_ID/appRoleAssignments" \
-    --body "{'principalId':'$IDENTITY_PRINCIPAL_ID','resourceId':'$GRAPH_RESOURCE_ID','appRoleId':'$SITES_SELECTED_ID'}" \
-    --headers "Content-Type=application/json" || echo "   ⚠️  Permission API 'Sites.Selected' peut-être déjà attribuée."
+# --- SharePoint Permissions ---
+echo -e "\n2. Attribution des permissions pour SharePoint..."
+# 2a. Trouver le service principal de SharePoint
+SHAREPOINT_APP_ID="00000003-0000-0ff1-ce00-000000000000"
+SHAREPOINT_SP_ID=$(az ad sp show --id $SHAREPOINT_APP_ID --query id -o tsv)
+
+if [ -z "$SHAREPOINT_SP_ID" ]; then
+    echo "   ❌ Service Principal pour SharePoint Online non trouvé. Étrange."
+else
+    # 2b. Obtenir et attribuer l'ID de la permission Sites.Selected pour SharePoint
+    echo "   - Récupération et attribution de 'Sites.Selected' (SharePoint)..."
+    SP_SITES_SELECTED_ID=$(az ad sp show --id "$SHAREPOINT_SP_ID" --query "appRoles[?value=='Sites.Selected'].id" -o tsv)
+
+    if [ -z "$SP_SITES_SELECTED_ID" ]; then
+        echo "   ❌ Permission 'Sites.Selected' non trouvée pour SharePoint."
+    else
+        az rest --method POST \
+            --uri "https://graph.microsoft.com/v1.0/servicePrincipals/$IDENTITY_PRINCIPAL_ID/appRoleAssignments" \
+            --body "{'principalId':'$IDENTITY_PRINCIPAL_ID','resourceId':'$SHAREPOINT_SP_ID','appRoleId':'$SP_SITES_SELECTED_ID'}" \
+            --headers "Content-Type=application/json" >/dev/null || echo "     ⚠️  Permission API 'Sites.Selected' (SharePoint) peut-être déjà attribuée."
+        echo "     ✅ Permission 'Sites.Selected' (SharePoint) traitée."
+    fi
+fi
+
 
 # 3. Récupérer l'ID du site SharePoint à partir de l'URL
 echo -e "\n3. Récupération de l'ID du site SharePoint..."
@@ -80,13 +103,3 @@ az rest --method GET \
     --output table
 
 echo -e "\n✅ Configuration des permissions restreintes terminée!"
-echo -e "\n‼️  ACTION MANUELLE REQUISE ‼️"
-echo "Pour finaliser le verrouillage, vous devez MANUELLEMENT révoquer les permissions larges."
-echo "1. Allez sur le Portail Azure -> Azure Active Directory -> Applications d'entreprise."
-echo "2. Cherchez '$USER_IDENTITY_NAME' (ou par Client ID: $IDENTITY_CLIENT_ID)."
-echo "3. Allez dans la section 'Permissions'."
-echo "4. Révoquez 'Sites.ReadWrite.All' et 'Files.ReadWrite.All'."
-echo -e "\n💡 Attendez 5-10 minutes pour la propagation des nouvelles permissions avant de tester."
-
-echo -e "\n🔗 Commandes pour tester dans l'ACI:"
-echo "az container exec --resource-group $RESOURCE_GROUP --name aci-sharepoint-test --exec-command /bin/bash" 

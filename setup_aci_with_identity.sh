@@ -107,8 +107,7 @@ GRAPH_APP_ID="00000003-0000-0000-c000-000000000000"
 
 # Permissions nécessaires pour SharePoint
 declare -a PERMISSIONS=(
-    "Sites.ReadWrite.All"
-    "Files.ReadWrite.All"
+    "Sites.Selected"
     "User.Read"
 )
 
@@ -161,8 +160,40 @@ az container create \
 
 echo -e "${GREEN}✅ Container Instance créé${NC}"
 
-# 7. Vérification du status du container
-echo -e "\n${YELLOW}7. Vérification du status du container...${NC}"
+# Récupération du FQDN du container
+CONTAINER_FQDN=$(az container show --resource-group "$RESOURCE_GROUP" --name "$CONTAINER_NAME" --query ipAddress.fqdn -o tsv)
+echo -e "   FQDN: ${CONTAINER_FQDN}"
+
+# 7. Mise à jour de la configuration SSH locale (~/.ssh/config)
+echo -e "\n${YELLOW}7. Mise à jour de la configuration SSH locale (~/.ssh/config)...${NC}"
+SSH_CONFIG_FILE="$HOME/.ssh/config"
+HOST_ALIAS="${CONTAINER_NAME}-aci"
+
+# Assurez-vous que le répertoire .ssh existe et a les bonnes permissions
+mkdir -p "$HOME/.ssh"
+chmod 700 "$HOME/.ssh"
+
+# Supprimer l'ancienne entrée si elle existe
+sed -i "/^Host $HOST_ALIAS/,/^$/d" "$SSH_CONFIG_FILE" 2>/dev/null || true
+
+# Ajouter la nouvelle entrée
+cat << EOF >> "$SSH_CONFIG_FILE"
+
+Host $HOST_ALIAS
+  HostName $CONTAINER_FQDN
+  User $SSH_USER
+  Port $SSH_PORT
+  IdentityFile ~/.ssh/aci_rsa # Assurez-vous que c'est la bonne clé privée
+  StrictHostKeyChecking no
+  UserKnownHostsFile=/dev/null
+
+EOF
+
+chmod 600 "$SSH_CONFIG_FILE" # Assurez-vous que les permissions sont correctes
+echo -e "${GREEN}✅ Configuration SSH mise à jour pour '$HOST_ALIAS'${NC}"
+
+# 8. Vérification du status du container
+echo -e "\n${YELLOW}8. Vérification du status du container...${NC}"
 sleep 10
 
 CONTAINER_STATE=$(az container show --resource-group "$RESOURCE_GROUP" --name "$CONTAINER_NAME" --query instanceView.state -o tsv)
@@ -189,8 +220,8 @@ echo -e "\n${YELLOW}🔗 Informations de connexion SSH:${NC}"
 echo -e "${BLUE}# Récupérer l'IP publique du container${NC}"
 echo -e "az container show --resource-group $RESOURCE_GROUP --name $CONTAINER_NAME --query ipAddress.ip -o tsv"
 
-echo -e "\n${BLUE}# Connexion SSH (remplacez IP_ADDRESS par l'IP obtenue ci-dessus)${NC}"
-echo -e "ssh $SSH_USER@IP_ADDRESS"
+echo -e "\n${BLUE}# Connexion SSH (maintenant via l'alias configuré dans ~/.ssh/config)${NC}"
+echo -e "ssh ${HOST_ALIAS}"
 
 echo -e "\n${YELLOW}🔑 Identifiants SSH:${NC}"
 echo -e "   Utilisateur: ${SSH_USER}"
@@ -221,7 +252,7 @@ echo -e "\n${YELLOW}📝 Configuration Remote SSH dans Cursor:${NC}"
 echo -e "${BLUE}1. Ouvrez Cursor${NC}"
 echo -e "${BLUE}2. Appuyez sur Ctrl+Shift+P (ou Cmd+Shift+P sur Mac)${NC}"
 echo -e "${BLUE}3. Tapez 'Remote-SSH: Connect to Host'${NC}"
-echo -e "${BLUE}4. Entrez: $SSH_USER@IP_ADDRESS${NC}"
+echo -e "${BLUE}4. Entrez: ${HOST_ALIAS}${NC}"
 echo -e "${BLUE}5. Choisissez 'Linux' comme plateforme${NC}"
 echo -e "${BLUE}6. Entrez le mot de passe: $SSH_PASSWORD${NC}"
 

@@ -8,7 +8,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 # Chargement de la configuration
-load_dotenv('config.env')
+load_dotenv('.env')
 
 
 def write_file_simple():
